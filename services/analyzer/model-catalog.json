@@ -1,0 +1,20 @@
+[
+  {
+    "detector":"text-ai","repo":"onnx-community/tmr-ai-text-detector-ONNX","revision":"b9aa251e5bcda7e429fcc936767d921435945b60",
+    "license":"mit","languages":["en"],"aiLabel":"ai","dtype":"q8","threshold":0.7,"maxTokens":512,
+    "files":["config.json","tokenizer.json","tokenizer_config.json","special_tokens_map.json","vocab.json","merges.txt","onnx/model_quantized.onnx"],
+    "weightSha256":"a1ff8a917090467375ceaf47667459e431217d5691df463c57b7194624f3ff79"
+  },
+  {
+    "detector":"deepfake","repo":"onnx-community/Deep-Fake-Detector-v2-Model-ONNX","revision":"4ea3d66dfb1bedca29727c6a0c6fa061d5f3f9c9",
+    "license":"apache-2.0","languages":[],"aiLabel":"Deepfake","dtype":"q8","threshold":0.7,"maxTokens":512,
+    "files":["config.json","preprocessor_config.json","onnx/model_quantized.onnx"],
+    "weightSha256":"3519c22b9695f99ddc00821228eeac91239065a90bfbdb4917858b3ec1dcfc42"
+  },
+  {
+    "detector":"image-ai","repo":"miraklodiwska1/siglip-ai-vs-human-onnx","revision":"1d9fafbfda85e363bda1d575029bd5404cb1b19c",
+    "license":"apache-2.0","languages":[],"aiLabel":"ai","dtype":"fp32","threshold":0.7,"maxTokens":512,
+    "files":["onnx/model.onnx"],"weightSha256":"b0b82e15a57d1cb72a2920098fd39634c7013ff05a66ce7673c38bea12d3363b",
+    "configSource":{"repo":"Ateeqq/ai-vs-human-image-detector","revision":"60e82406916921b823616bee33397baab38af3f0","files":["config.json","preprocessor_config.json"]}
+  }
+]

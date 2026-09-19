@@ -1,0 +1,14 @@
+# Only analyzer build inputs belong in the container context.
+**
+!package.json
+!pnpm-lock.yaml
+!pnpm-workspace.yaml
+!tsconfig.json
+!cloudflare-env.d.ts
+!lib
+!lib/**
+!services
+!services/analyzer
+!services/analyzer/**
+services/analyzer/.env
+services/analyzer/.env.*
