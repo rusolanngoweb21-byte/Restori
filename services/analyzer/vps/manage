@@ -1,0 +1,51 @@
+#!/bin/sh
+set -eu
+directory=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+image=prizma-analyzer:local
+action=${1:-}
+run_smoke() {
+  docker run --rm --pull never --network none \
+    --read-only --cap-drop ALL --security-opt no-new-privileges \
+    --memory 1536m --memory-swap 1536m --cpus 1 --pids-limit 128 \
+    --tmpfs /tmp:size=64M,noexec,nosuid \
+    --mount "type=bind,src=$directory/smoke.mjs,dst=/app/vps-smoke.mjs,readonly" \
+    --entrypoint node "$image" /app/vps-smoke.mjs
+}
+run_setup() {
+  docker run --rm --pull never --network none --user 0:0 \
+    --read-only --cap-drop ALL --security-opt no-new-privileges \
+    --memory 128m --memory-swap 128m --pids-limit 32 \
+    --mount "type=bind,src=$directory,dst=/setup" \
+    --entrypoint node "$image" /setup/setup.mjs "$@"
+}
+case "$action" in
+  prepare)
+    run_smoke
+    run_setup prepare
+    ;;
+  activate)
+    [ "$#" -eq 2 ] || { echo 'Encrypted envelope required' >&2; exit 2; }
+    run_setup install "$2"
+    exec docker compose --project-name prizma --file "$directory/compose.yaml" up -d --no-build --pull never analyzer
+    ;;
+  smoke)
+    run_smoke
+    ;;
+  start)
+    exec docker compose --project-name prizma --file "$directory/compose.yaml" up -d --no-build --pull never analyzer
+    ;;
+  health)
+    exec docker compose --project-name prizma --file "$directory/compose.yaml" exec -T analyzer \
+      node -e 'fetch("http://127.0.0.1:8080/healthz").then(async r=>{console.log(await r.text());process.exit(r.ok?0:1)}).catch(()=>process.exit(1))'
+    ;;
+  logs)
+    exec docker compose --project-name prizma --file "$directory/compose.yaml" logs --tail 50 analyzer
+    ;;
+  stop)
+    exec docker compose --project-name prizma --file "$directory/compose.yaml" stop analyzer
+    ;;
+  *)
+    echo 'Usage: manage prepare | activate <encrypted-envelope> | smoke | start | health | logs | stop' >&2
+    exit 2
+    ;;
+esac

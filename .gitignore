@@ -1,0 +1,8 @@
+/node_modules/
+/dist-worker/
+/.models/
+/.sites-runtime/
+/services/analyzer/vps/.private/
+.env
+.env.*
+!.env.example

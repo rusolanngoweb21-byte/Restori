@@ -1,0 +1,36 @@
+name: prizma
+services:
+  analyzer:
+    image: prizma-analyzer:local
+    pull_policy: never
+    init: true
+    env_file: .private/worker.env
+    environment:
+      MODEL_MANIFEST: /opt/prizma/models/manifest.json
+      PORT: "8080"
+      REQUIRE_CLAMAV: "0"
+    read_only: true
+    tmpfs:
+      - /tmp:size=64M,noexec,nosuid
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 1536m
+    memswap_limit: 1536m
+    cpus: 1.0
+    cpu_shares: 256
+    pids_limit: 128
+    restart: "on-failure:3"
+    stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:8080/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      start_period: 240s
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    # No published host ports: the worker polls the Site using outbound HTTPS.
+    # This first-stage profile advertises models only; antivirus remains unavailable.

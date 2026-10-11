@@ -18,3 +18,5 @@
 !tests/fixtures/model-process.mjs
 services/analyzer/.env
 services/analyzer/.env.*
+# Deployment helpers and private host enrollment files never enter the image.
+services/analyzer/vps
