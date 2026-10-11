@@ -11,16 +11,12 @@ import {
   type Outcome,
 } from "../../lib/contracts.ts";
 import { sha256 } from "../../lib/http.ts";
+import { workerOrigin } from "./origin.ts";
 
-const base = new URL(process.env.PRIZMA_SITE_URL || "");
-if (
-  base.protocol !== "https:" &&
-  !(
-    process.env.PRIZMA_LOCAL === "1" &&
-    ["127.0.0.1", "localhost"].includes(base.hostname)
-  )
-)
-  throw new Error("HTTPS_REQUIRED");
+const base = workerOrigin(process.env.PRIZMA_SITE_URL || "", {
+  local: process.env.PRIZMA_LOCAL === "1",
+  selfHosted: process.env.PRIZMA_SELF_HOSTED === "1",
+});
 const secret = process.env.WORKER_SERVICE_TOKEN || "";
 if (secret.length < 32) throw new Error("WORKER_SERVICE_TOKEN_REQUIRED");
 const id = (process.env.WORKER_ID || hostname())

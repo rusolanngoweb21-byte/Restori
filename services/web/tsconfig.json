@@ -1,0 +1,6 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": { "incremental": false },
+  "include": ["./*.ts", "./*.tsx", "../../app/page.tsx", "../../components/**/*.tsx", "../../tests/web-*.test.ts", "../../tests/worker-origin.test.ts", "../../cloudflare-env.d.ts"],
+  "exclude": ["../../node_modules", "../../dist-web", "../../dist-worker"]
+}

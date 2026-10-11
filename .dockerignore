@@ -20,3 +20,18 @@ services/analyzer/.env
 services/analyzer/.env.*
 # Deployment helpers and private host enrollment files never enter the image.
 services/analyzer/vps
+!app
+!app/page.tsx
+!app/globals.css
+!components
+!components/**
+!vendor
+!vendor/**
+!public
+!public/**
+!drizzle
+!drizzle/**
+!postcss.config.mjs
+!services/web
+!services/web/**
+services/web/vps

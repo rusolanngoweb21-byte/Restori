@@ -1,0 +1,34 @@
+#!/bin/sh
+set -eu
+directory=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+repository=$(CDPATH= cd -- "$directory/../../.." && pwd)
+action=${1:-}
+case "$action" in
+  build)
+    exec docker build --network none --file "$repository/services/web/Dockerfile" --tag prizma-selfhost:local "$repository"
+    ;;
+  configure)
+    [ "$#" -eq 2 ] || { echo 'HTTPS origin required' >&2; exit 2; }
+    gateway=$(docker network inspect --format '{{(index .IPAM.Config 0).Gateway}}' prizma_default)
+    exec docker run --rm --pull never --network none --user 0:0 \
+      --read-only --cap-drop ALL --cap-add CHOWN --security-opt no-new-privileges \
+      --memory 128m --memory-swap 128m --pids-limit 32 \
+      --mount "type=bind,src=$directory,dst=/setup" \
+      --entrypoint node prizma-analyzer:local /setup/setup.mjs "$2" "$gateway"
+    ;;
+  start)
+    [ -f "$directory/.private/web.env" ] || { echo 'Configure the HTTPS origin first' >&2; exit 2; }
+    exec docker compose --project-name prizma --file "$directory/compose.yaml" up -d --no-build --pull never web analyzer
+    ;;
+  health)
+    exec docker compose --project-name prizma --file "$directory/compose.yaml" exec -T web node --input-type=module -e \
+      'for(const [name,url] of [["web","http://127.0.0.1:8081/healthz"],["analyzer","http://analyzer:8080/healthz"]]){try{const r=await fetch(url,{signal:AbortSignal.timeout(5000)});console.log(name+" "+r.status+" "+await r.text());if(!r.ok)process.exitCode=1}catch{console.log(name+" unavailable");process.exitCode=1}}'
+    ;;
+  logs)
+    exec docker compose --project-name prizma --file "$directory/compose.yaml" logs --tail 30 web analyzer
+    ;;
+  stop)
+    exec docker compose --project-name prizma --file "$directory/compose.yaml" stop web analyzer
+    ;;
+  *) echo 'Usage: manage build | configure <https-origin> | start | health | logs | stop' >&2; exit 2 ;;
+esac
