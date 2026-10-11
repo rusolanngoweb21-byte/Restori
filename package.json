@@ -14,7 +14,7 @@
     "db:generate": "drizzle-kit generate",
     "typecheck": "tsc --noEmit",
     "test": "node --test tests/*.test.ts",
-    "test:analyzer": "node --test tests/analyzer-health.test.ts tests/clamav.test.ts",
+    "test:analyzer": "node --test tests/analyzer-health.test.ts tests/clamav.test.ts tests/model-process.test.ts",
     "build:analyzer": "node services/analyzer/build.ts",
     "models:prepare": "node services/analyzer/prepare-models.ts",
     "test:e2e": "node tests/e2e.ts",

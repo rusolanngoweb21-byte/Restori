@@ -1,8 +1,26 @@
 # Prizma analyzer
 
-Persistent Node.js 24 worker for the Prizma Site. It polls the authenticated Site queue over HTTPS; it does not need a public domain. ClamAV must remain on Railway private networking.
+Node.js 24 queue worker for the Prizma Site. It polls the authenticated Site queue over HTTPS; it does not need a public domain. ClamAV must remain on a private container network.
 
-## Railway service
+## Current budget constraint
+
+Use the already-paid `adaptivevpn-ci-01` host for capacity testing. Do not upgrade
+Railway, provision another server, or buy a domain. The user reported 4 GB host
+RAM (3.2 GiB available), 2 CPU cores and 24.5 GB free disk on 2026-10-11.
+Railway services remain offline. A pending repository attachment is not a deployment.
+
+The analyzer validates models sequentially at startup, then keeps no resident
+inference process while idle. Each media job starts one model in a child process,
+and waits for that process to exit before taking another job. This releases native
+ONNX allocations as well as JavaScript objects. Loading plus inference has one
+60-second deadline; the parent continues heartbeats. Cold loading costs latency.
+This change does not establish the combined live memory requirement of ClamAV,
+inference, CI builds and other host services. Measure it before enabling the stack.
+
+On this host the existing installer uses Ubuntu 24.04's `docker.io`. Its Compose
+package is `docker-compose-v2`; adding it does not require changing Docker vendors.
+
+## Original Railway profile (inactive)
 
 - Dockerfile: `services/analyzer/Dockerfile`, build context: repository root.
 - Start: `node dist-worker/services/analyzer/worker.js`.

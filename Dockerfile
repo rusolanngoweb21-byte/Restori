@@ -6,9 +6,10 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN corepack pnpm install --frozen-lockfile
 COPY lib ./lib
 COPY services/analyzer ./services/analyzer
-COPY tests/analyzer-health.test.ts tests/clamav.test.ts ./tests/
+COPY tests/analyzer-health.test.ts tests/clamav.test.ts tests/model-process.test.ts ./tests/
+COPY tests/fixtures/model-process.mjs ./tests/fixtures/
 COPY tsconfig.json cloudflare-env.d.ts ./
-RUN node --test tests/analyzer-health.test.ts tests/clamav.test.ts
+RUN node --test tests/analyzer-health.test.ts tests/clamav.test.ts tests/model-process.test.ts
 RUN node services/analyzer/build.ts
 # Bundle the pinned models in the image. Railway has no local .models mount.
 RUN node services/analyzer/prepare-models.ts /opt/prizma/models

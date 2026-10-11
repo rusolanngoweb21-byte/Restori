@@ -13,5 +13,8 @@
 !tests
 !tests/analyzer-health.test.ts
 !tests/clamav.test.ts
+!tests/model-process.test.ts
+!tests/fixtures
+!tests/fixtures/model-process.mjs
 services/analyzer/.env
 services/analyzer/.env.*

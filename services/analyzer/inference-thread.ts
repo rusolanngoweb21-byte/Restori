@@ -1,4 +1,3 @@
-import { parentPort, workerData } from "node:worker_threads";
 import {
   env,
   pipeline,
@@ -15,7 +14,11 @@ import type { MediaInput, Outcome } from "../../lib/contracts.ts";
 env.allowRemoteModels = false;
 env.allowLocalModels = true;
 if (env.backends.onnx.wasm) env.backends.onnx.wasm.numThreads = 1;
-const manifests = workerData as ModelManifest[];
+if (!process.send) throw new Error("MODEL_IPC_REQUIRED");
+const manifests = await new Promise<ModelManifest[]>((resolve) => {
+  process.once("message", (message: { models: ModelManifest[] }) => resolve(message.models));
+});
+if (manifests.length !== 1) throw new Error("ONE_MODEL_REQUIRED");
 type Classifier = (
   input: string | RawImage,
   options: { top_k: number; truncation: boolean },
@@ -50,7 +53,7 @@ for (const model of manifests) {
       "onnx",
       model.dtype === "q8" ? "model_quantized.onnx" : "model.onnx",
     ),
-    { executionProviders: ["cpu"], intraOpNumThreads: 2, interOpNumThreads: 1 },
+    { executionProviders: ["cpu"], intraOpNumThreads: 1, interOpNumThreads: 1 },
   );
   if (graph.inputNames.length !== 1 || graph.inputNames[0] !== "pixel_values")
     throw new Error("IMAGE_MODEL_INPUTS");
@@ -78,8 +81,8 @@ for (const model of manifests) {
     }));
   });
 }
-parentPort!.postMessage({ ready: true });
-parentPort!.on(
+process.send!({ ready: true });
+process.on(
   "message",
   async ({ version, input }: { version: string; input: MediaInput }) => {
     let outcome: Outcome;
@@ -96,7 +99,7 @@ parentPort!.on(
         });
         const encoded = await tokenizer(input.text, { truncation: false });
         if (encoded.input_ids.size > model.maxTokens) {
-          parentPort!.postMessage({
+          process.send!({
             outcome: {
               status: "inconclusive",
               code: "TEXT_TOO_LONG",
@@ -172,6 +175,6 @@ parentPort!.on(
           "Модель не смогла надёжно обработать эти данные. Процент не рассчитан.",
       };
     }
-    parentPort!.postMessage({ outcome });
+    process.send!({ outcome });
   },
 );

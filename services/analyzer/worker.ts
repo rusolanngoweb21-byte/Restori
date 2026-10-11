@@ -1,12 +1,11 @@
-import { Worker } from "node:worker_threads";
+import { ModelProcess } from "./model-process.ts";
 import { hostname } from "node:os";
-import { loadManifests, type ModelManifest } from "./manifest.ts";
+import { loadManifests } from "./manifest.ts";
 import { safeDownload } from "./safe-download.ts";
 import { clamVersion, scanBytes, type ClamConnection } from "./clamav.ts";
 import { startHealthServer } from "./health.ts";
 import {
   capabilitySchema,
-  outcomeSchema,
   type Capability,
   type JobInput,
   type Outcome,
@@ -30,9 +29,8 @@ const id = (process.env.WORKER_ID || hostname())
 const models = process.env.MODEL_MANIFEST
   ? await loadManifests(process.env.MODEL_MANIFEST)
   : [];
+const modelProcess = new ModelProcess(models);
 let stopping = false,
-  thread: Worker | null = null,
-  modelsReady = false,
   lastSiteSuccess = 0,
   lastClamSuccess = 0;
 const clam: ClamConnection | undefined = process.env.CLAM_SOCKET
@@ -44,7 +42,7 @@ let engine: string | null = null;
 const healthServer = process.env.PORT
   ? startHealthServer(Number(process.env.PORT), () => ({
       stopping,
-      modelsReady: modelsReady && !!thread,
+      modelsReady: modelProcess.ready,
       clamavReady: !!engine && Date.now() - lastClamSuccess < 90000,
       siteReady: Date.now() - lastSiteSuccess < 45000,
     }), process.env.REQUIRE_CLAMAV === "1")
@@ -65,109 +63,6 @@ async function api(path: string, body: unknown) {
   lastSiteSuccess = Date.now();
   return value;
 }
-async function startInference(manifests: ModelManifest[]) {
-  if (!manifests.length) return;
-  const source = import.meta.url.endsWith(".ts");
-  thread = new Worker(
-    new URL(
-      source ? "./inference-thread.ts" : "./inference-thread.js",
-      import.meta.url,
-    ),
-    {
-      workerData: manifests,
-      execArgv: source ? ["--experimental-transform-types"] : [],
-      resourceLimits: { maxOldGenerationSizeMb: 2048 },
-    },
-  );
-  try {
-    await new Promise<void>((resolve, reject) => {
-      const timer = setTimeout(() => {
-        void thread?.terminate();
-        reject(new Error("MODEL_START_TIMEOUT"));
-      }, 180000);
-      thread!.once("message", (value) => {
-        clearTimeout(timer);
-        if (value?.ready === true) resolve();
-        else reject(new Error("MODEL_START_RESPONSE"));
-      });
-      thread!.once("error", (error) => {
-        clearTimeout(timer);
-        reject(error);
-      });
-    });
-    modelsReady = true;
-    const active = thread;
-    active.on("error", () => {
-      if (thread === active) {
-        thread = null;
-        modelsReady = false;
-      }
-    });
-    active.on("exit", () => {
-      if (thread === active) {
-        thread = null;
-        modelsReady = false;
-      }
-    });
-  } catch (error) {
-    const failed = thread;
-    thread = null;
-    modelsReady = false;
-    await failed.terminate();
-    throw error;
-  }
-}
-async function infer(version: string, input: JobInput): Promise<Outcome> {
-  if (!thread)
-    return {
-      status: "unavailable",
-      code: "MODEL_UNAVAILABLE",
-      details: "Модель сейчас недоступна.",
-    };
-  const current = thread;
-  return new Promise((resolve) => {
-    const finish = (outcome: Outcome) => {
-      clearTimeout(timer);
-      current.off("message", received);
-      current.off("error", failed);
-      resolve(outcome);
-    };
-    const received = (value: { outcome: unknown }) => {
-      const parsed = outcomeSchema.safeParse(value.outcome);
-      finish(
-        parsed.success
-          ? parsed.data
-          : {
-              status: "failed",
-              code: "MODEL_RESPONSE",
-              details: "Некорректный ответ модели.",
-            },
-      );
-    };
-    const failed = () => {
-      thread = null;
-      modelsReady = false;
-      finish({
-        status: "failed",
-        code: "MODEL_FAILURE",
-        details: "Обработчик модели остановился.",
-      });
-    };
-    const timer = setTimeout(() => {
-      thread = null;
-      modelsReady = false;
-      void current.terminate();
-      finish({
-        status: "unavailable",
-        code: "MODEL_TIMEOUT",
-        details: "Модель не завершила анализ за 60 секунд.",
-      });
-    }, 60000);
-    current.once("message", received);
-    current.once("error", failed);
-    current.postMessage({ version, input });
-  });
-}
 async function capabilities(): Promise<Capability[]> {
   try {
     engine = clam ? await clamVersion(clam) : null;
@@ -178,7 +73,7 @@ async function capabilities(): Promise<Capability[]> {
   return capabilitySchema
     .array()
     .parse([
-      ...(thread
+      ...(modelProcess.ready
         ? models.map((m) => ({
             detector: m.detector,
             version: m.version,
@@ -196,7 +91,7 @@ async function capabilities(): Promise<Capability[]> {
         : []),
     ]);
 }
-await startInference(models);
+await modelProcess.initialize();
 let caps = await capabilities(),
   lastMaintenance = 0;
 const heartbeat = setInterval(() => {
@@ -204,7 +99,7 @@ const heartbeat = setInterval(() => {
     workerId: id,
     capabilities: stopping ? [] : caps.filter((cap) => cap.detector === "url-signature"
       ? !!engine && Date.now() - lastClamSuccess < 90000
-      : modelsReady && !!thread),
+      : modelProcess.ready),
     claim: false,
   }).catch(() => {});
 }, 15000);
@@ -212,11 +107,12 @@ for (const signal of ["SIGTERM", "SIGINT"] as const)
   process.on(signal, () => {
     stopping = true;
     healthServer?.close();
+    void modelProcess.close();
   });
 while (!stopping) {
   try {
-    if (models.length && !thread) {
-      await startInference(models);
+    if (models.length && !modelProcess.ready) {
+      await modelProcess.initialize();
       caps = await capabilities();
     }
     if (Date.now() - lastMaintenance > 60000) {
@@ -270,7 +166,7 @@ while (!stopping) {
             "Содержимое по ссылке не удалось полностью проверить. Переход остаётся закрыт.",
         };
       }
-    } else outcome = await infer(job.version, job.input);
+    } else outcome = await modelProcess.infer(job.version, job.input);
     await api("/api/internal/complete", {
       id: job.id,
       lease: job.lease,
@@ -301,4 +197,4 @@ await api("/api/internal/claim", {
   capabilities: [],
   claim: false,
 }).catch(() => {});
-await (thread as Worker | null)?.terminate();
+await modelProcess.close();
