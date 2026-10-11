@@ -21,7 +21,9 @@ export function clamCommand(
     const timer = setTimeout(() => finish(new Error("CLAM_TIMEOUT")), 12000);
     socket.on("error", (error) => finish(error));
     socket.on("end", () =>
-      finish(reply.length ? undefined : new Error("CLAM_EMPTY")),
+      // Commands use z framing: only a NUL terminator completes the reply.
+      // EOF alone can mean a truncated verdict, including a partial "OK".
+      finish(new Error(reply.length ? "CLAM_INCOMPLETE" : "CLAM_EMPTY")),
     );
     socket.on("data", (data: Buffer) => {
       reply = Buffer.concat([reply, data]);

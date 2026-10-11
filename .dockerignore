@@ -10,5 +10,8 @@
 !services
 !services/analyzer
 !services/analyzer/**
+!tests
+!tests/analyzer-health.test.ts
+!tests/clamav.test.ts
 services/analyzer/.env
 services/analyzer/.env.*
