@@ -15,7 +15,8 @@ services:
     ports:
       - "127.0.0.1:18080:3000"
     read_only: true
-    tmpfs: [/tmp:size=32M,noexec,nosuid]
+    tmpfs:
+      - /tmp:size=32M,noexec,nosuid
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
     mem_limit: 384m
@@ -49,7 +50,8 @@ services:
     depends_on:
       web: { condition: service_healthy }
     read_only: true
-    tmpfs: [/tmp:size=64M,noexec,nosuid]
+    tmpfs:
+      - /tmp:size=64M,noexec,nosuid
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
     mem_limit: 1536m
