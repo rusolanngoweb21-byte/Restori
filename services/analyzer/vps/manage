@@ -31,6 +31,15 @@ case "$action" in
   smoke)
     run_smoke
     ;;
+  access-probe)
+    [ "$#" -eq 2 ] || { echo 'Encrypted service credential required' >&2; exit 2; }
+    exec docker run --rm --pull never --user 0:0 \
+      --read-only --cap-drop ALL --security-opt no-new-privileges \
+      --memory 128m --memory-swap 128m --pids-limit 32 \
+      --env-file "$directory/.private/worker.env" \
+      --mount "type=bind,src=$directory,dst=/setup,readonly" \
+      --entrypoint node "$image" /setup/access-probe.mjs "$2"
+    ;;
   start)
     exec docker compose --project-name prizma --file "$directory/compose.yaml" up -d --no-build --pull never analyzer
     ;;
@@ -45,7 +54,7 @@ case "$action" in
     exec docker compose --project-name prizma --file "$directory/compose.yaml" stop analyzer
     ;;
   *)
-    echo 'Usage: manage prepare | activate <encrypted-envelope> | smoke | start | health | logs | stop' >&2
+    echo 'Usage: manage prepare | activate <encrypted-envelope> | access-probe <encrypted-envelope> | smoke | start | health | logs | stop' >&2
     exit 2
     ;;
 esac

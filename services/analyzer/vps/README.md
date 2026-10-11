@@ -39,7 +39,25 @@ never be committed or shared.
 The `.private` directory is excluded from Git; the entire VPS helper directory
 is excluded from the Docker build context. Enrollment runs with no network and
 does not mount the Docker socket. `.private/worker.env` is consumed only by the
-host Compose CLI and the worker runtime.
+host Compose CLI, the worker runtime and the one-shot access probe below.
+
+## Diagnose hosted Site access
+
+When the VPS receives a Cloudflare HTML block before reaching the application,
+`manage access-probe '<encrypted-envelope>'` can check the documented Sites
+service-access header using an existing credential returned to the Site owner.
+The operator encrypts that credential with `sealAccessToken(token, publicKey)`
+from `access-probe.mjs`. This envelope has its own version and cryptographic
+context, separate from worker enrollment. No credential is generated or rotated.
+
+The probe runs in a disposable 128 MiB container. It reads the existing private
+key and worker environment, sends one authenticated heartbeat with no advertised
+capabilities and no job claim, and prints only status, Cloudflare identifiers and
+an access result. It is pinned to this Site and never follows redirects. The
+helper directory is mounted read-only; it does not install the service credential
+or restart the running analyzer. `SITE_ACCESS_OK` confirms this probe only, not a
+working analyzer or a completed model job. A continued 403 needs investigation
+by the managed Site edge operator; it does not justify changing app authorization.
 
 ## Verification and current scope
 
@@ -56,4 +74,4 @@ Antivirus and reputation-provider checks still have to be configured and
 verified before the URL navigation safety gate can clear links. Missing checks
 continue to return hold; the safety gate is not bypassed by this deployment.
 
-Local setup tests: `node --test tests/vps-setup.test.ts`.
+Local setup tests: `node --test tests/vps-setup.test.ts tests/vps-access-probe.test.ts`.
