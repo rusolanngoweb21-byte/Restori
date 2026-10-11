@@ -1,0 +1,10 @@
+{
+  "extends":"../../tsconfig.json",
+  "compilerOptions":{
+    "module":"NodeNext","moduleResolution":"NodeNext","target":"ES2022",
+    "noEmit":false,"outDir":"../../dist-worker","rootDir":"../..",
+    "rewriteRelativeImportExtensions":true,"incremental":false,"plugins":[]
+  },
+  "include":["./*.ts"],
+  "exclude":["../../node_modules","../../dist-worker"]
+}
