@@ -21,6 +21,7 @@ The executable `services/web/vps/manage` supports one operation at a time:
 | `configure <https-origin>` | Save the public origin and exact Docker gateway IP; create the private SQLite directory owned by uid 1000. Repeating the same configuration is safe; different existing settings are refused. |
 | `start` | Start the web service, then replace only the Prizma analyzer container after database readiness. |
 | `health` | Report database/API and real analyzer readiness. |
+| `proxy-install` | Install the inspected server's separate HTTPS listener on port 8443; requires root and the host's existing Python 3, Nginx, OpenSSL and IP certificate. |
 | `logs` | Show the last 30 service log lines. |
 | `stop` | Stop only these two Prizma services, retaining data. |
 
@@ -29,6 +30,18 @@ The existing worker token is reused from its private environment file; never pas
 Nginx must forward the selected site's public traffic to the loopback listener, set `Host` to the exact configured public authority (including any non-default port), and replace `X-Real-IP` with its socket client address. Do not use a client-supplied forwarded header as the source. Disable caching for `/api/`, cap request bodies at 2,850,000 bytes, bound timeouts and disallow `/api/internal/` at the proxy as defense in depth. The public listener itself never routes worker endpoints. Verify `nginx -t` before a reload and keep existing configuration/certificates active if validation fails.
 
 Only the Nginx configuration determines where public TLS terminates. Short-lived IP certificates require automatic renewal and a successful-configuration-only reload hook. Check the public certificate, renewal path, real model result and cross-session denial before announcing a new public address.
+
+### Verified VPS listener
+
+The target VPS has been inspected: `185.68.22.22`, existing Nginx sites on 80/443, `/etc/nginx/conf.d/*.conf` included, no real-IP rewrite directives, and an existing Let's Encrypt certificate with the exact IP SAN. The separate origin is `https://185.68.22.22:8443`. This deployment helper is deliberately pinned to that inspected host; it is not a general-purpose proxy installer.
+
+`proxy-install` first verifies the configured public origin, existing Nginx configuration, free port, certificate lifetime and loopback API including the Docker gateway trust. It writes only `/etc/nginx/conf.d/prizma-8443.conf` using exclusive atomic creation. It refuses an unexpected existing file or symlink. After `nginx -t`, it requests a graceful reload, then verifies HTTPS locally with the system CA store and exact public IP, the page/API, Host rejection and the inaccessible worker API. Failure removes only the file created by this invocation and reloads the previous configuration when necessary. The existing 80/443 server files, firewall, certificates and application data are not changed. An identical existing file is checked without replacing it.
+
+Success reports `HTTPS_LOCAL_OK`; it does **not** establish access through the provider firewall, successful certificate renewal, or a real model job over the external connection. Those are still deployment gates. If a failed first installation leaves `ROLLBACK_RELOAD_FAILED` or `ROLLBACK_REFUSED_CONFIG_CHANGED`, inspect Nginx before proceeding.
+
+SSH hangup, termination and interrupt signals are recorded and handled at transaction boundaries, so publication is completed atomically and rollback can finish. Forced termination (`SIGKILL`), power loss and concurrent administrative edits still require inspection; no script can roll back while its process or host is stopped.
+
+The helper and template live outside the container image. Pulling these files is enough; no container rebuild is required. Local rollback/preservation tests use `python3 tests/web-proxy.test.py`. The actual Nginx syntax and trusted TLS probe are checked on the VPS during installation, because the local development environment has no Nginx or Docker daemon.
 
 ## Data and resources
 

@@ -24,11 +24,14 @@ case "$action" in
     exec docker compose --project-name prizma --file "$directory/compose.yaml" exec -T web node --input-type=module -e \
       'for(const [name,url] of [["web","http://127.0.0.1:8081/healthz"],["analyzer","http://analyzer:8080/healthz"]]){try{const r=await fetch(url,{signal:AbortSignal.timeout(5000)});console.log(name+" "+r.status+" "+await r.text());if(!r.ok)process.exitCode=1}catch{console.log(name+" unavailable");process.exitCode=1}}'
     ;;
+  proxy-install)
+    exec python3 "$directory/proxy.py"
+    ;;
   logs)
     exec docker compose --project-name prizma --file "$directory/compose.yaml" logs --tail 30 web analyzer
     ;;
   stop)
     exec docker compose --project-name prizma --file "$directory/compose.yaml" stop web analyzer
     ;;
-  *) echo 'Usage: manage build | configure <https-origin> | start | health | logs | stop' >&2; exit 2 ;;
+  *) echo 'Usage: manage build | configure <https-origin> | start | health | proxy-install | logs | stop' >&2; exit 2 ;;
 esac
