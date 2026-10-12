@@ -85,4 +85,11 @@
 - A paired request from the running VPS web container identified the cause: the shared Accept value `application/dns-json, application/rdap+json, application/json` returned HTTP 400; the exact `application/dns-json` value returned HTTP 200 with DNS records.
 - The scanner now uses the exact DNS media type for the existing Cloudflare endpoint and retains RDAP/JSON media types for other providers. Endpoints, timeouts, body limits, cache rules and unknown-on-failure behavior are unchanged.
 - The regression test failed before the fix (0/7 available infrastructure signals) and passed afterward. A second test verifies that a DNS HTTP failure stays unknown while RDAP data is retained.
-- Deployment is pending: pull the published change, rebuild the existing self-host image, start the Prizma services and repeat the public report check. Do not claim the live DNS issue is fixed until that check succeeds.
+- Deployed and verified on 2026-10-12: the user pulled 7c409f1, built image 9fd2411ec307 and started the containers. A public browser check of example.com at 11:20 MSK returned 31/37 available signals, including all 7/7 infrastructure signals, while the incomplete threat check continued to hold navigation.
+
+## Antivirus capacity gate (2026-10-12)
+
+- At 11:22 MSK the host reported 3.8 GiB total RAM, 844 MiB used, 3.0 GiB available, and no swap. At 11:25 MSK Docker reported analyzer 41.07 MiB / 1.5 GiB and web 48.95 MiB / 384 MiB, both below 1% CPU. These are idle observations, not simultaneous peak-load proof.
+- The optional `manage antivirus-probe` runs real official database update/validation and clean/EICAR scans serially under a 1536 MiB cap, with host headroom/CI monitoring. It never connects to the worker or changes application capability registration. The cap is below the vendor's recommended capacity: an unsuccessful trial must stop, not trigger a paid upgrade or an unbounded run.
+- Local tests cover headroom refusal, CI refusal, update failure, OOM classification, clean/detection result requirements, ownership-aware cleanup, and explicit non-production reporting. Docker is not available in the assistant environment; the actual image, signature download, memory peak and engine scan remain unverified until the VPS probe runs.
+- A successful probe still requires a daemon/renewal design with nonconcurrent reload and retained database integrity testing, measured simultaneous model/host load, and a real public scan before advertising antivirus availability.

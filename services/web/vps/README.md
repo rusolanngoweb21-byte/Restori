@@ -53,6 +53,36 @@ Web memory is capped at 384 MiB; analyzer at 1536 MiB, processing models sequent
 
 ClamAV, WebRisk and URLhaus are not configured by this bundle. Missing checks continue to show unavailable and hold navigation. Do not advertise a full malware check or simulate a clean response. Model confidence is the existing uncalibrated score, not measured accuracy.
 
+### Optional antivirus capacity probe
+
+`manage antivirus-probe` performs a one-shot test; it does **not** enable ClamAV in
+the application. Run it when CI is idle. It requires root, Docker, cgroup v2 peak
+accounting, at least 2304 MiB MemAvailable and 2 GiB free on Docker's filesystem.
+ClamAV officially recommends 3 GiB or more; this 1536 MiB capped trial is an
+experiment for this constrained host, not a claim that the recommended capacity
+has been met. A memory-limit failure means stop and reconsider deployment.
+
+The probe pulls official `clamav/clamav:1.4.6`, resolves the image ID, and creates
+the labeled `prizma_clamav_probe_db` volume, retaining signature downloads for
+reuse. A foreign volume with that name is rejected. FreshClam updates and tests
+the database (`TestDatabases yes`) before a separate offline ClamScan process
+checks a benign fixture and the harmless EICAR test string. These run serially,
+each capped at 1536 MiB, no swap and 0.5 CPU. No port or app configuration is
+changed; no host files are scanned. The scan mounts the database read-only.
+
+The host monitor stops the probe if available memory falls below 768 MiB, an
+AdaptiveVPN Runner.Worker starts, a deadline expires or the terminal disconnects.
+Docker's hard memory limit applies independently of this sampled monitor; the
+monitor cannot guarantee protection from an instantaneous unrelated host spike.
+Only containers labeled with this invocation's random token are removed.
+Image and database volume remain for reuse; test fixtures are removed.
+
+`CLAM_PROBE_OK` reports the update and scan peaks. It is not validation of clamd,
+simultaneous model/CI load, automatic database renewal or the public workflow.
+Those gates must pass before enabling `CLAM_HOST` in the analyzer. Failure leaves
+the current unavailable/hold behavior intact. A rejected database download must
+be diagnosed from its output; do not loop retries or change network routes.
+
 ## Local validation
 
 `PRIZMA_TEST_STORAGE=disk node --test tests/*.test.ts` exercises the existing security suite against the actual disk adapter as well as new HTTP, storage and origin tests. `node services/analyzer/build.ts` compiles the worker. `node node_modules/vite/bin/vite.js build --config services/web/vite.config.ts` builds the UI. `node node_modules/typescript/bin/tsc -p services/web/tsconfig.json --noEmit` checks the standalone source.

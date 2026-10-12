@@ -27,11 +27,14 @@ case "$action" in
   proxy-install)
     exec python3 "$directory/proxy.py"
     ;;
+  antivirus-probe)
+    exec python3 "$directory/antivirus_probe.py"
+    ;;
   logs)
     exec docker compose --project-name prizma --file "$directory/compose.yaml" logs --tail 30 web analyzer
     ;;
   stop)
     exec docker compose --project-name prizma --file "$directory/compose.yaml" stop web analyzer
     ;;
-  *) echo 'Usage: manage build | configure <https-origin> | start | health | proxy-install | logs | stop' >&2; exit 2 ;;
+  *) echo 'Usage: manage build | configure <https-origin> | start | health | proxy-install | antivirus-probe | logs | stop' >&2; exit 2 ;;
 esac
