@@ -62,8 +62,8 @@ languages without spaces. It does not decide AI origin.
   worker compilation and Vite build passed. The deployment tests use a Docker test
   double and do not validate a real image. All four real models passed local
   inference; Russian boundary tests cover excess tokens and formatting-only input.
-- Remaining release gates: candidate Docker build and bounded offline model smoke
-  on the VPS, activation, public Russian job and combined host memory observation.
+- VPS build, activation and public Russian job verified on 2026-10-12; details
+  below. Combined peak host load with CI and ClamAV remains untested.
   There is no Docker daemon or direct SSH in the assistant environment.
 
 `manage build-multilingual` builds candidate model/app images and runs all four
@@ -130,3 +130,57 @@ The measurement programme must:
 Immediate next quality work is a measured baseline with independently labeled data.
 An evaluation harness, dataset and calibrated model improvements are still pending;
 this section records the requirement and proposed method, not their completion.
+
+
+## VPS verification — 2026-10-12
+
+User screenshots confirm image 0a7422d13074, MULTILINGUAL_BUILD_OK and MODELS_OK.
+English, AI-image and Russian inference completed; the deepfake fixture returned
+inconclusive, an accepted abstention rather than a runtime error. The isolated
+smoke cgroup reported memoryPeakMiB=1099 under limit 1536. This is the smoke peak,
+not a combined host-load benchmark. `manage start` recreated web and analyzer;
+`manage health` returned web 200/status ok and analyzer 200/status ready with
+models=true, site=true, clamav=false.
+
+A live browser submission at https://185.68.22.22:8443/ selected Russian and sent
+112 words / 874 characters of explicitly synthetic workshop prose. The UI moved
+from queued to result ready and rendered the model's completed AI-class output.
+The displayed 100.0% is an uncalibrated model score, NOT accuracy. The check proves
+public integration only. ClamAV remains disabled. Other languages remain pending.
+
+## Approved visual direction — 2026-10-12 13:02 MSK
+
+The user approved a complete luxury website with desktop priority, rich visuals,
+deep emerald/graphite, light accents, expressive typography and a dimensional
+prism. Separate mobile-version work is deferred. The user may fund one year of a
+custom domain; no purchase is authorized or needed for this interface change.
+
+This is a bounded redesign of existing page and report flows: retain the link,
+text/image and source-report behavior, live availability, privacy, uncertainty and
+navigation restrictions. Use local vector geometry and CSS motion with reduced
+motion support; no new backend, paid provider, remote font or runtime dependency.
+Basic layout containment on narrow screens remains part of valid CSS. Validate
+TypeScript/build, actual UI layout and existing functional contracts. The target
+97–98% accuracy is not displayed as an achieved product claim.
+
+
+### Interface implementation verification
+
+The approved interface is implemented in the existing page, global styles and
+media panel, with decorative artwork in components/prism-visual.tsx. Existing
+request and worker contracts are unchanged. The media panel opens by default;
+results explicitly label the uncalibrated model score. A skip link, visible focus
+styles, persistent section anchors and reduced-motion-aware result scrolling are
+included. No new dependencies or network assets were added.
+
+Verification: 55 existing Node tests passed; web TypeScript, root TypeScript and
+Vite production build passed. Independent code review found no remaining
+Critical/Important issues after reduced-motion handling; its minor transient
+anchor issue was corrected as well. Qodo CLI was absent from PATH and the
+documented fallback, so no Qodo review result is claimed. No UI-specific tests
+that mirror CSS implementation were added.
+
+Cloud Browser rejected file:// local preview under its URL policy. No workaround
+was attempted. Rendered layout/keyboard interaction of this new interface still
+requires the ordinary HTTPS deployment on the VPS. Production activation remains
+a separate user-executed step; a source commit alone does not deploy the UI.

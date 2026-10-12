@@ -108,7 +108,7 @@ function OutcomeView({ outcome }: { outcome: Outcome | null }) {
     <div
       className={`media-outcome ${outcome.result.isAI ? "attention" : "neutral"}`}
     >
-      <div className="model-score">
+      <div className="model-score"><span className="model-score-label">Балл модели</span>
         {outcome.result.confidence.toLocaleString("ru-RU", {
           maximumFractionDigits: 1,
         })}
@@ -375,14 +375,14 @@ export function AuthenticityPanel({
           </div>
         </div>
       )}
-      <Accordion type="single" collapsible className="media-accordion">
+      <Accordion type="single" collapsible className="media-accordion" defaultValue="content">
         <AccordionItem value="content">
           <AccordionTrigger className="media-trigger">
             <span>
               <ImagePlus size={20} />
               Проверить фото или текст
             </span>
-            <span className="optional-tag">Дополнительно</span>
+            <span className="optional-tag">Подлинность контента</span>
           </AccordionTrigger>
           <AccordionContent>
             <div className="media-workspace">
