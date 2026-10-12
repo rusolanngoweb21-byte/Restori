@@ -81,3 +81,52 @@ copies, and return insufficient evidence when retrieval/comparison cannot suppor
 a conclusion. Language support must be tested separately for retrieval and evidence
 comparison. Model confidence alone must never become a FakeNews verdict. Paid
 provider keys or additional hosting require a separate user decision.
+
+## User quality target — 2026-10-12 12:42 MSK
+
+The user requires 97–98% accuracy across parameters. Record this as the requested
+quality target, not an achieved metric or a guarantee for arbitrary future inputs.
+The 58 automated software tests establish implementation behavior, not detection
+accuracy. The pinned Russian card reports 96.3% accuracy on its own held-out corpus
+at a different decision threshold; Prizma has not independently reproduced that
+result. No production threshold or displayed score is changed by this requirement.
+
+The measurement programme must:
+
+1. Establish a labeled, versioned evaluation set per module and language. Include
+   different genres, human and generated samples, unseen generators, edited/mixed
+   authorship, image recompression and realistic benign/malicious URL cases. Use
+   verified provenance; mixed authorship and uncertain truth need explicit labels.
+   Avoid duplicate authors/documents/source families across train, calibration and
+   final test splits. Keep a later temporal and generator-held-out test. Preserve
+   the final test for independent evaluation, not repeated threshold tuning.
+2. Report confusion matrices, class-specific precision and recall, false positive
+   and false negative rates, balanced and deployment-weighted accuracy with class
+   prevalence. Break results down by language, modality, domain and generator.
+   One pooled score cannot establish every module's or subgroup's quality.
+3. Count every eligible request in the main denominator. Unknown, unavailable and
+   abstained cases are unresolved, never correct by default. Also report accuracy
+   among answered cases, coverage, class-specific abstention and operational
+   failure rates separately. Raising abstention alone cannot satisfy the overall
+   97–98% target. Define eligibility before seeing results, and publish exclusions.
+4. Compare calibrated thresholds on a separate validation set; calibration makes
+   scores interpretable but does not by itself improve classification accuracy.
+   Evaluate alternatives, complementary ensembles and, where feasible under the
+   no-extra-spending constraint, training on verified error cases. Adopt only
+   measured improvements; agreement of correlated models is not independent proof.
+5. For each claimed 97% or 98% quality level, report sample count and confidence
+   intervals; the corresponding lower 95% confidence bound must meet the claimed
+   level on the prespecified evaluation population. Use source-cluster-aware
+   uncertainty where samples are correlated and account for multiple subgroup
+   claims. Small groups remain unverified. Do not imply a bound on future drift.
+6. Fact-checking needs claim extraction, dated primary sources, evidence comparison
+   and review of contradictory/insufficient evidence. URL reputation and malware
+   detection need current provider/engine validation. AI-origin scores alone cannot
+   establish any of these properties. Test each subsystem and the final user outcome.
+7. Rerun regression and drift checks after model, data, threshold or provider changes.
+   Keep test data public/licensed or explicitly contributed; do not retain private
+   user submissions for training as a side effect of quality monitoring.
+
+Immediate next quality work is a measured baseline with independently labeled data.
+An evaluation harness, dataset and calibrated model improvements are still pending;
+this section records the requirement and proposed method, not their completion.
