@@ -23,7 +23,7 @@ export class ModelProcess {
     this.ready = false;
     this.initializing = true;
     try {
-      // Prove each model can load before advertising it, without retaining all three.
+      // Prove each model can load before advertising it, retaining none between jobs.
       for (const model of this.models) await this.execute(model);
       this.ready = this.models.length > 0 && !this.closed;
     } finally { this.initializing = false; }
@@ -34,6 +34,8 @@ export class ModelProcess {
     const model = this.models.find((value) => value.version === version && value.detector === input.detector);
     if (!this.ready || this.closed || !model)
       return { status: "unavailable", code: "MODEL_UNAVAILABLE", details: "Модель сейчас недоступна." };
+    if (input.detector === "text-ai" && !model.languages.includes(input.language))
+      return { status: "unavailable", code: "LANGUAGE_UNSUPPORTED", details: "Эта модель не поддерживает выбранный язык." };
     try {
       return (await this.execute(model, input))!;
     } catch (error) {

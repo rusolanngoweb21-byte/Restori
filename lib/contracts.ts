@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { languageSchema } from "./languages.ts";
 
 export const detectorSchema = z.enum([
   "image-ai",
@@ -11,7 +12,7 @@ export const capabilitySchema = z
   .object({
     detector: detectorSchema,
     version: z.string().regex(/^[a-f0-9]{64}$/),
-    languages: z.array(z.enum(["ru", "en"])).max(2),
+    languages: z.array(languageSchema).max(languageSchema.options.length),
   })
   .strict();
 export type Capability = z.infer<typeof capabilitySchema>;
@@ -73,7 +74,7 @@ export const mediaInputSchema = z.discriminatedUnion("detector", [
     .object({
       detector: z.literal("text-ai"),
       text: z.string().min(1).max(12000),
-      language: z.enum(["ru", "en"]),
+      language: languageSchema,
     })
     .strict(),
   z

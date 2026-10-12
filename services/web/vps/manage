@@ -3,9 +3,35 @@ set -eu
 directory=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 repository=$(CDPATH= cd -- "$directory/../../.." && pwd)
 action=${1:-}
+run_model_smoke() {
+  docker run --rm --pull never --network none \
+    --read-only --cap-drop ALL --security-opt no-new-privileges \
+    --memory 1536m --memory-swap 1536m --cpus 1 --pids-limit 128 \
+    --tmpfs /tmp:size=64M,noexec,nosuid \
+    --env PRIZMA_EXPECT_LANGUAGES=en,ru \
+    --mount "type=bind,src=$repository/services/analyzer/vps/smoke.mjs,dst=/app/vps-smoke.mjs,readonly" \
+    --entrypoint node "$1" /app/vps-smoke.mjs
+}
 case "$action" in
   build)
-    exec docker build --network none --file "$repository/services/web/Dockerfile" --tag prizma-selfhost:local "$repository"
+    model_image=prizma-analyzer:local
+    if docker image inspect prizma-models:multilingual >/dev/null 2>&1; then
+      model_image=prizma-models:multilingual
+    fi
+    exec docker build --network none --build-arg "MODEL_IMAGE=$model_image" --file "$repository/services/web/Dockerfile" --tag prizma-selfhost:local "$repository"
+    ;;
+  build-multilingual)
+    # No service restart: retain the installed image tags unless offline inference succeeds.
+    docker build --file "$repository/services/analyzer/Dockerfile.multilingual" --tag prizma-models:multilingual-candidate "$repository"
+    docker build --network none --build-arg MODEL_IMAGE=prizma-models:multilingual-candidate \
+      --file "$repository/services/web/Dockerfile" --tag prizma-selfhost:multilingual-candidate "$repository"
+    run_model_smoke prizma-selfhost:multilingual-candidate
+    docker tag prizma-models:multilingual-candidate prizma-models:multilingual
+    docker tag prizma-selfhost:multilingual-candidate prizma-selfhost:local
+    echo MULTILINGUAL_BUILD_OK
+    ;;
+  model-smoke)
+    run_model_smoke prizma-selfhost:local
     ;;
   configure)
     [ "$#" -eq 2 ] || { echo 'HTTPS origin required' >&2; exit 2; }
@@ -36,5 +62,5 @@ case "$action" in
   stop)
     exec docker compose --project-name prizma --file "$directory/compose.yaml" stop web analyzer
     ;;
-  *) echo 'Usage: manage build | configure <https-origin> | start | health | proxy-install | antivirus-probe | logs | stop' >&2; exit 2 ;;
+  *) echo 'Usage: manage build | build-multilingual | model-smoke | configure <https-origin> | start | health | proxy-install | antivirus-probe | logs | stop' >&2; exit 2 ;;
 esac

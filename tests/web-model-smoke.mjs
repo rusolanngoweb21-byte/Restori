@@ -63,7 +63,14 @@ try {
   assert(caps.some(c => c.detector === "text-ai"), "Real worker did not become ready");
   console.log(JSON.stringify({ event: "real_models_ready", detectors: caps.map(c => c.detector) }));
   const text = "The community garden opened on a rainy Saturday morning. Neighbours brought wooden boxes, seeds, and a pot of hot tea. We spent the first hour clearing the path beside the old wall, then measured the beds and wrote a planting schedule. I had never grown carrots before, so one of the volunteers showed me how shallow the rows should be. By noon the rain had stopped. Two children counted the worms we found in the soil, while their grandfather repaired a broken bench. We agreed to meet again next weekend and see which seeds had started to grow.";
-  const queued = await request("/api/media", { detector: "text-ai", language: "en", text });
+  const cases = [{ language: "en", text }];
+  if (process.env.PRIZMA_EXPECT_LANGUAGES?.split(",").includes("ru")) {
+    assert(caps.some(c => c.detector === "text-ai" && c.languages.includes("ru")), "Russian capability required");
+    cases.push({ language: "ru", text: "Вчера мы пришли в городской парк и увидели новую дорожку возле старого пруда. Соседи рассказали о планах благоустройства и предложили вместе обсудить будущую посадку деревьев. ".repeat(4) });
+  }
+  const retained = [];
+  for (const input of cases) {
+  const queued = await request("/api/media", { detector: "text-ai", ...input });
   assert.equal(queued.status, 202);
   const job = JSON.parse(queued.text), cookie = queued.headers["set-cookie"][0].split(";")[0];
   assert.equal((await request("/api/jobs/" + job.id)).status, 404);
@@ -73,15 +80,21 @@ try {
     if (result.state === "finished") break;
     await new Promise(resolve => setTimeout(resolve, 500));
   }
-  assert.equal(result.state, "finished"); assert.equal(result.outcome.status, "completed");
-  assert.equal(result.outcome.result.modality, "text");
+  assert.equal(job.version, caps.find(c => c.detector === "text-ai" && c.languages.includes(input.language)).version);
+  assert.equal(result.state, "finished");
+  assert(result.outcome.status === "completed" || result.outcome.code === "AMBIGUOUS_SCORE", JSON.stringify(result.outcome));
+  if (result.outcome.status === "completed") assert.equal(result.outcome.result.modality, "text");
   assert.equal(await app.store.bucket.get("inputs/" + job.id), null);
+  retained.push({ job, cookie, result, language: input.language });
+  }
   const stopped = once(worker, "close"); worker.kill("SIGTERM"); await stopped; worker = undefined;
   await closeServers(); app.close(); app = openStore(path); await start();
+  for (const { job, cookie, result, language } of retained) {
   const resumed = await request("/api/jobs/" + job.id, undefined, cookie);
   assert.equal(resumed.status, 200); assert.deepEqual(JSON.parse(resumed.text).outcome, result.outcome);
   assert.equal((await request("/api/jobs/" + job.id)).status, 404);
-  console.log(JSON.stringify({ event: "real_http_model_job", status: result.outcome.status, restartRetained: true, foreignSessionDenied: true, rawInputDeleted: true }));
+  console.log(JSON.stringify({ event: "real_http_model_job", language, status: result.outcome.status, restartRetained: true, foreignSessionDenied: true, rawInputDeleted: true }));
+  }
 } finally {
   if (worker && worker.exitCode === null) { const stopped = once(worker, "close"); worker.kill("SIGTERM"); await stopped; }
   await closeServers(); app.close(); rmSync(directory, { recursive: true, force: true });

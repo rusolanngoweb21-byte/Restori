@@ -6,6 +6,7 @@ import { pipeline } from "node:stream/promises";
 import path from "node:path";
 import { modelSchema } from "./manifest.ts";
 type Entry = {
+  id?: string;
   detector: string;
   repo: string;
   revision: string;
@@ -17,6 +18,8 @@ type Entry = {
   maxTokens: number;
   files: string[];
   weightSha256: string;
+  textRuntime?: "ru-modernbert-v1";
+  assetSha256?: Record<string, string>;
   configSource?: { repo: string; revision: string; files: string[] };
 };
 const catalog = JSON.parse(
@@ -25,8 +28,11 @@ const catalog = JSON.parse(
 const directory = path.resolve(process.argv[2] || ".models");
 await mkdir(directory, { recursive: true });
 const manifests: unknown[] = [];
+const ids = catalog.map(item => item.id ?? item.detector);
+if (ids.some(id => !/^[a-z0-9-]+$/.test(id)) || new Set(ids).size !== ids.length)
+  throw new Error("MODEL_DIRECTORY_DUPLICATE");
 for (const item of catalog) {
-  const local = path.join(directory, item.detector);
+  const local = path.join(directory, item.id ?? item.detector);
   await mkdir(local, { recursive: true });
   const assets = [
     ...item.files.map((file) => ({
@@ -44,6 +50,8 @@ for (const item of catalog) {
   ];
   const hashes: Record<string, string> = {};
   for (const asset of assets) {
+    const expectedHash = item.assetSha256?.[asset.file] ?? (asset.file.endsWith(".onnx") ? item.weightSha256 : undefined);
+    if (item.assetSha256 && !expectedHash) throw new Error("ASSET_CHECKSUM_MISSING");
     const filename = path.join(local, asset.file);
     await mkdir(path.dirname(filename), { recursive: true });
     let existing: Buffer | undefined;
@@ -52,7 +60,7 @@ for (const item of catalog) {
     } catch {}
     if (existing) {
       const hash = createHash("sha256").update(existing).digest("hex");
-      if (!asset.file.endsWith(".onnx") || hash === item.weightSha256) {
+      if (!expectedHash || hash === expectedHash) {
         hashes[asset.file] = hash;
         continue;
       }
@@ -80,8 +88,8 @@ for (const item of catalog) {
         createWriteStream(filename + ".part"),
       );
       const digest = hash.digest("hex");
-      if (asset.file.endsWith(".onnx") && digest !== item.weightSha256)
-        throw new Error("WEIGHT_CHECKSUM");
+      if (expectedHash && digest !== expectedHash)
+        throw new Error("ASSET_CHECKSUM");
       await rename(filename + ".part", filename);
       hashes[asset.file] = digest;
     } catch (error) {
@@ -99,7 +107,7 @@ for (const item of catalog) {
   }
   const manifest = modelSchema.parse({
     detector: item.detector,
-    directory: item.detector,
+    directory: item.id ?? item.detector,
     source: `https://huggingface.co/${item.repo}`,
     revision: item.revision,
     license: item.license,
@@ -108,14 +116,14 @@ for (const item of catalog) {
     dtype: item.dtype,
     threshold: item.threshold,
     maxTokens: item.maxTokens,
+    ...(item.textRuntime ? { textRuntime: item.textRuntime } : {}),
     files: hashes,
   });
   manifests.push(manifest);
-  await writeFile(
-    path.join(directory, "manifest.json"),
-    JSON.stringify(manifests, null, 2) + "\n",
-  );
 }
+// Publish the complete set only after every pinned asset has been verified.
+await writeFile(path.join(directory, "manifest.json.part"), JSON.stringify(manifests, null, 2) + "\n");
+await rename(path.join(directory, "manifest.json.part"), path.join(directory, "manifest.json"));
 console.log(
   "All model assets pinned and hashed. Run the validation script before connecting a worker.",
 );

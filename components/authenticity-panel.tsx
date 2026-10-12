@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { countWords, languageSchema, type TextLanguage } from "@/lib/languages";
 import {
   ImagePlus,
   FileText,
@@ -145,7 +146,7 @@ export function AuthenticityPanel({
   const [detector, setDetector] = useState<"image-ai" | "deepfake">("image-ai"),
     [file, setFile] = useState<File | null>(null),
     [text, setText] = useState(""),
-    [language, setLanguage] = useState<"ru" | "en">("ru");
+    [language, setLanguage] = useState<TextLanguage>("ru");
   const [imageInitial, setImageInitial] = useState<JobView | null>(null),
     [textInitial, setTextInitial] = useState<JobView | null>(null);
   const [submitting, setSubmitting] = useState<"image" | "text" | null>(null),
@@ -482,12 +483,15 @@ export function AuthenticityPanel({
                       value={language}
                       disabled={textBusy}
                       onChange={(e) => {
-                        setLanguage(e.target.value as "ru" | "en");
+                        setLanguage(languageSchema.parse(e.target.value));
                         setTextInitial(null);
                       }}
                     >
-                      <option value="ru">Русский</option>
-                      <option value="en">English</option>
+                      {[...new Set<TextLanguage>(["ru", "en", ...capabilities.filter(c => c.detector === "text-ai").flatMap(c => c.languages)])].map(code => (
+                        <option key={code} value={code}>
+                          {code === "ru" ? "Русский" : code === "en" ? "English" : new Intl.DisplayNames(["ru"], { type: "language" }).of(code)}
+                        </option>
+                      ))}
                     </select>
                   </div>
                   <Textarea
@@ -504,9 +508,10 @@ export function AuthenticityPanel({
                     rows={6}
                   />
                   <p className="text-count">
-                    {text.trim() ? text.trim().split(/\s+/).length : 0} слов ·{" "}
+                    {countWords(text, language)} слов ·{" "}
                     {text.length} / 12 000 символов
                   </p>
+                  <p className="text-count">Оцениваем признаки генерации ИИ. Достоверность фактов этой проверкой не устанавливается.</p>
                   {!textReady && availability !== "loading" && (
                     <p className="module-unavailable">
                       Для выбранного языка сейчас нет подключённой модели.

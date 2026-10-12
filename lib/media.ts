@@ -1,6 +1,7 @@
 import { mediaInputSchema, type MediaInput } from "./contracts.ts";
 import { ApiError, sha256 } from "./http.ts";
 import type { Store } from "./store.ts";
+import { countWords, scriptMatches } from "./languages.ts";
 
 export function validateMedia(value: unknown): MediaInput {
   const parsed = mediaInputSchema.safeParse(value);
@@ -13,15 +14,13 @@ export function validateMedia(value: unknown): MediaInput {
   const input = parsed.data;
   if (input.detector === "text-ai") {
     input.text = input.text.trim();
-    if (input.text.length < 400 || input.text.split(/\s+/u).length < 80)
+    if (input.text.length < 400 || countWords(input.text, input.language) < 80)
       throw new ApiError(
         422,
         "TEXT_TOO_SHORT",
         "Для анализа нужен связный текст: не менее 80 слов и 400 символов.",
       );
-    const letters = input.text.match(/\p{L}/gu)?.length || 1;
-    const cyrillic = input.text.match(/\p{Script=Cyrillic}/gu)?.length || 0;
-    if (input.language === "en" && cyrillic / letters > 0.1)
+    if (!scriptMatches(input.text, input.language))
       throw new ApiError(
         422,
         "LANGUAGE_MISMATCH",

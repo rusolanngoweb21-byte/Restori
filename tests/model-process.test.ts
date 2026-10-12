@@ -9,7 +9,7 @@ import type { ModelManifest } from "../services/analyzer/manifest.ts";
 async function setup(timeoutMs = 3000) {
   const directory = await mkdtemp(path.join(tmpdir(), "prizma-process-"));
   const models = ["text-ai", "deepfake", "image-ai"].map((detector, i) => ({
-    detector, directory, version: String(i + 1).repeat(64),
+    detector, directory, version: String(i + 1).repeat(64), languages: detector === "text-ai" ? ["en"] : [],
   })) as ModelManifest[];
   const runner = new ModelProcess(models, {
     entrypoint: new URL("./fixtures/model-process.mjs", import.meta.url), timeoutMs,
@@ -22,6 +22,17 @@ async function setup(timeoutMs = 3000) {
 function assertExited(pid: number) {
   assert.throws(() => process.kill(pid, 0), { code: "ESRCH" }, "Native model process must exit before returning");
 }
+test("language mismatch is refused before launching inference and preserves readiness", async () => {
+  const h = await setup();
+  try {
+    await h.runner.initialize();
+    const before = await h.pids();
+    const result = await h.runner.infer(h.models[0].version, { detector: "text-ai", language: "ru", text: "Русский текст" });
+    assert.equal(result.status !== "completed" && result.code, "LANGUAGE_UNSUPPORTED");
+    assert.deepEqual(await h.pids(), before);
+    assert.equal(h.runner.ready, true);
+  } finally { await h.cleanup(); }
+});
 const input = (text: string) => ({ detector: "text-ai" as const, language: "en" as const, text });
 
 test("model validation leaves no resident model process; each job releases its process", async () => {

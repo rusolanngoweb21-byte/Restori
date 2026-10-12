@@ -1,0 +1,11 @@
+# Extend the installed bundle; download only the newly pinned Russian assets.
+FROM prizma-analyzer:local AS prepare
+USER root
+WORKDIR /app
+COPY lib ./lib
+COPY services/analyzer ./services/analyzer
+RUN node services/analyzer/prepare-models.ts /opt/prizma/models
+
+FROM prizma-analyzer:local
+COPY --from=prepare /opt/prizma/models/text-ai-ru /opt/prizma/models/text-ai-ru
+COPY --from=prepare /opt/prizma/models/manifest.json /opt/prizma/models/manifest.json

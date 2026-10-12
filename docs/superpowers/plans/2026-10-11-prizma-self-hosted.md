@@ -93,3 +93,8 @@
 - The optional `manage antivirus-probe` runs real official database update/validation and clean/EICAR scans serially under a 1536 MiB cap, with host headroom/CI monitoring. It never connects to the worker or changes application capability registration. The cap is below the vendor's recommended capacity: an unsuccessful trial must stop, not trigger a paid upgrade or an unbounded run.
 - Local tests cover headroom refusal, CI refusal, update failure, OOM classification, clean/detection result requirements, ownership-aware cleanup, and explicit non-production reporting. Docker is not available in the assistant environment; the actual image, signature download, memory peak and engine scan remain unverified until the VPS probe runs.
 - A successful probe still requires a daemon/renewal design with nonconcurrent reload and retained database integrity testing, measured simultaneous model/host load, and a real public scan before advertising antivirus availability.
+- VPS probe verified by the user's 2026-10-12 11:49 MSK screenshot: CLAM_PROBE_OK,
+  updatePeakMiB 91, scanPeakMiB 958, limitMiB 1536, applicationEnabled false,
+  combinedModelLoadTested false. ClamAV is still not enabled in the application.
+- Russian/English model extension is tracked separately in
+  `2026-10-12-multilingual-text.md`; preparing it does not establish deployment.

@@ -3,6 +3,7 @@ import { readFile, readdir, lstat, realpath } from "node:fs/promises";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import { detectorSchema } from "../../lib/contracts.ts";
+import { languageSchema, MAX_MODELS } from "../../lib/languages.ts";
 export const modelSchema = z
   .object({
     detector: detectorSchema.exclude(["url-signature"]),
@@ -10,14 +11,16 @@ export const modelSchema = z
     source: z.string().url(),
     revision: z.string().regex(/^[a-f0-9]{40}$/),
     license: z.string().min(1),
-    languages: z.array(z.enum(["ru", "en"])).max(2),
+    languages: z.array(languageSchema).max(languageSchema.options.length),
+    textRuntime: z.literal("ru-modernbert-v1").optional(),
     aiLabel: z.string().min(1),
     dtype: z.enum(["fp32", "q8"]),
     threshold: z.number().min(0.6).max(0.95).default(0.7),
     maxTokens: z.number().int().min(128).max(2048).default(512),
     files: z.record(z.string().regex(/^[a-f0-9]{64}$/)),
   })
-  .strict();
+  .strict()
+  .refine(m => !m.textRuntime || (m.detector === "text-ai" && m.dtype === "fp32" && m.aiLabel === "ai" && m.languages.length === 1 && m.languages[0] === "ru"), "MODEL_RUNTIME_CONFIGURATION");
 export type ModelManifest = z.infer<typeof modelSchema> & { version: string };
 async function filesUnder(directory: string, prefix = ""): Promise<string[]> {
   const entries = await readdir(path.join(directory, prefix), {
@@ -39,13 +42,16 @@ export async function loadManifests(
 ): Promise<ModelManifest[]> {
   const list = modelSchema
     .array()
-    .max(3)
+    .max(MAX_MODELS)
     .parse(JSON.parse(await readFile(filename, "utf8")));
   const manifests: ModelManifest[] = [];
+  const directories = new Set<string>();
   for (const model of list) {
     const directory = await realpath(
       path.resolve(path.dirname(filename), model.directory),
     );
+    if (directories.has(directory)) throw new Error("MODEL_DIRECTORY_DUPLICATE");
+    directories.add(directory);
     if (!(await lstat(directory)).isDirectory())
       throw new Error("MODEL_DIRECTORY");
     const files = await filesUnder(directory),

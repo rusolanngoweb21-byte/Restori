@@ -18,6 +18,8 @@ The executable `services/web/vps/manage` supports one operation at a time:
 | Operation | Effect |
 | --- | --- |
 | `build` | Build `prizma-selfhost:local` from the existing local analyzer image; does not start services. |
+| `build-multilingual` | Download the pinned Russian model into a candidate bundle, build the candidate app, run bounded offline inference, then promote image tags on success. Does not start services. |
+| `model-smoke` | Run installed English, Russian and image models offline in a temporary container capped at 1536 MiB. |
 | `configure <https-origin>` | Save the public origin and exact Docker gateway IP; create the private SQLite directory owned by uid 1000. Repeating the same configuration is safe; different existing settings are refused. |
 | `start` | Start the web service, then replace only the Prizma analyzer container after database readiness. |
 | `health` | Report database/API and real analyzer readiness. |
@@ -26,6 +28,28 @@ The executable `services/web/vps/manage` supports one operation at a time:
 | `stop` | Stop only these two Prizma services, retaining data. |
 
 The existing worker token is reused from its private environment file; never paste or print it. No new enrollment or rotation is needed. Recreating the Docker network changes the gateway: revalidate proxy trust before restarting.
+
+### Russian and English text models
+
+The multilingual extension retains the English TMR detector and adds the pinned
+Russian RuModernBERT-small classifier. Other languages remain unavailable until
+a model with that declared coverage is installed. These detect signs of AI origin;
+they do not verify news facts. Detection scores are experimental and uncalibrated.
+
+After pulling this change, use `build-multilingual` once, while CI is idle and the
+host has room for an additional model process. About 145 MB of Russian assets are
+downloaded; no packages, paid API or new VPS are needed. The existing
+`prizma-analyzer:local` image must be present. A failed build or model smoke leaves
+the installed image tags and running containers unchanged. A successful build
+prints `MULTILINGUAL_BUILD_OK`; then use `start` and `health`, and verify a Russian
+job through the public interface. Routine `build` automatically uses the installed
+`prizma-models:multilingual` bundle and remains offline, so it retains Russian.
+
+The Russian input window is capped at 1024 tokens; English retains 512. Excess
+input is explicitly rejected instead of truncated. Models run serially in temporary
+processes; adding a model does not keep all model weights resident in RAM. The
+1536 MiB container limit is unchanged. The candidate smoke reports its cgroup peak;
+local process measurements do not establish the VPS's combined memory headroom.
 
 Nginx must forward the selected site's public traffic to the loopback listener, set `Host` to the exact configured public authority (including any non-default port), and replace `X-Real-IP` with its socket client address. Do not use a client-supplied forwarded header as the source. Disable caching for `/api/`, cap request bodies at 2,850,000 bytes, bound timeouts and disallow `/api/internal/` at the proxy as defense in depth. The public listener itself never routes worker endpoints. Verify `nginx -t` before a reload and keep existing configuration/certificates active if validation fails.
 

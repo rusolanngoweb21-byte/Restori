@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { analyzeLink, normalizeInput, type Report } from "./scanner.ts";
+import { MAX_CAPABILITIES } from "./languages.ts";
 import {
   capabilitySchema,
   outcomeSchema,
@@ -244,7 +245,7 @@ export function createApi({
       const data = z
         .object({
           workerId: z.string().regex(/^[a-zA-Z0-9_-]{1,64}$/),
-          capabilities: capabilitySchema.array().max(4),
+          capabilities: capabilitySchema.array().max(MAX_CAPABILITIES),
           claim: z.boolean().default(true),
         })
         .strict()

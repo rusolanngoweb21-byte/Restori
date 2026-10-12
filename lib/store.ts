@@ -1,3 +1,4 @@
+import { MAX_CAPABILITIES } from "./languages.ts";
 import {
   capabilitySchema,
   outcomeSchema,
@@ -91,7 +92,7 @@ export class Store {
     for (const row of rows.results)
       for (const cap of capabilitySchema
         .array()
-        .max(4)
+        .max(MAX_CAPABILITIES)
         .parse(JSON.parse(row.capabilities)))
         unique.set(cap.detector + cap.version, cap);
     return [...unique.values()];

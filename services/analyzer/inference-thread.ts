@@ -11,6 +11,8 @@ import path from "node:path";
 import sharp from "sharp";
 import type { ModelManifest } from "./manifest.ts";
 import type { MediaInput, Outcome } from "../../lib/contracts.ts";
+import { loadRuText, normalizeRuText } from "./ru-text.ts";
+import { countWords } from "../../lib/languages.ts";
 env.allowRemoteModels = false;
 env.allowLocalModels = true;
 if (env.backends.onnx.wasm) env.backends.onnx.wasm.numThreads = 1;
@@ -29,8 +31,20 @@ const loadPipeline = pipeline as unknown as (
   options: Record<string, unknown>,
 ) => Promise<Classifier>;
 const models = new Map<string, Classifier>();
+const tokenCounts = new Map<string, (text: string) => number>();
 for (const model of manifests) {
   if (model.detector === "text-ai") {
+    if (model.textRuntime === "ru-modernbert-v1") {
+      const russian = await loadRuText(model.directory);
+      tokenCounts.set(model.version, russian.countTokens);
+      models.set(model.version, async input => {
+        if (typeof input !== "string") throw new Error("TEXT_REQUIRED");
+        return russian.classify(input);
+      });
+      continue;
+    }
+    const tokenizer = await AutoTokenizer.from_pretrained(model.directory, { local_files_only: true });
+    tokenCounts.set(model.version, text => tokenizer(text, { truncation: false }).input_ids.size);
     models.set(
       model.version,
       await loadPipeline("text-classification", model.directory, {
@@ -94,11 +108,17 @@ process.on(
       if (input.detector === "text-ai") {
         if (!model.languages.includes(input.language))
           throw new Error("LANGUAGE_UNSUPPORTED");
-        const tokenizer = await AutoTokenizer.from_pretrained(model.directory, {
-          local_files_only: true,
-        });
-        const encoded = await tokenizer(input.text, { truncation: false });
-        if (encoded.input_ids.size > model.maxTokens) {
+        if (model.textRuntime === "ru-modernbert-v1") {
+          const normalized = normalizeRuText(input.text);
+          if (normalized.length < 400 || countWords(normalized, input.language) < 80) {
+            process.send!({ outcome: { status: "inconclusive", code: "TEXT_TOO_SHORT",
+              details: "После удаления форматирования осталось слишком мало текста. Нужно не менее 80 слов и 400 символов." } });
+            return;
+          }
+        }
+        const countTokens = tokenCounts.get(model.version);
+        if (!countTokens) throw new Error("TOKENIZER_REQUIRED");
+        if (countTokens(input.text) > model.maxTokens) {
           process.send!({
             outcome: {
               status: "inconclusive",
