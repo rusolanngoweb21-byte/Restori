@@ -30,22 +30,27 @@ test("service access envelope is recipient-bound, tamper-proof and separate from
 test("probe uses only the pinned Site and both documented authorization layers without claiming work", async () => {
   const report = await probe(serviceToken, settings, async (url, options) => {
     assert.equal(url, SITE_URL + "/api/internal/claim");
+    assert.ok(options);
     assert.equal(options.redirect, "manual");
-    assert.equal(options.headers.Authorization, "Bearer " + settings.WORKER_SERVICE_TOKEN);
-    assert.equal(options.headers["OAI-Sites-Authorization"], "Bearer " + serviceToken);
+    const headers = new Headers(options.headers);
+    assert.equal(headers.get("Authorization"), "Bearer " + settings.WORKER_SERVICE_TOKEN);
+    assert.equal(headers.get("OAI-Sites-Authorization"), "Bearer " + serviceToken);
+    assert.ok(typeof options.body === "string");
     assert.deepEqual(JSON.parse(options.body), { workerId: "prizma-access-probe", capabilities: [], claim: false });
     return Response.json({ job: null });
   });
   assert.equal(report.access, "SITE_ACCESS_OK");
   let requested = false;
-  await assert.rejects(probe(serviceToken, { ...settings, PRIZMA_SITE_URL: "https://other.invalid" }, async () => { requested = true; }), /SITE_URL_MISMATCH/);
+  await assert.rejects(probe(serviceToken, { ...settings, PRIZMA_SITE_URL: "https://other.invalid" }, async () => { requested = true; return new Response(); }), /SITE_URL_MISMATCH/);
   assert.equal(requested, false);
 });
 
 test("Cloudflare, application auth, and redirects remain distinguishable and never echo secrets", async () => {
   const upstream = `<title>Attention Required! | Cloudflare</title><h1>Sorry, you have been blocked</h1><span class="cf-error-code">1020</span>${serviceToken}${settings.WORKER_SERVICE_TOKEN}`;
   const blocked = await probe(serviceToken, settings, async () => new Response(upstream, { status: 403, headers: { "content-type": "text/html", "cf-ray": "123abc-FRA" } }));
+  assert.ok("blocked" in blocked);
   assert.equal(blocked.blocked, true);
+  assert.ok("cloudflareError" in blocked);
   assert.equal(blocked.cloudflareError, "1020");
   assert.equal(blocked.cloudflareRay, "123abc-FRA");
   assert.equal(blocked.access, "unconfirmed");

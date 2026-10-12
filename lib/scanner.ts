@@ -62,7 +62,9 @@ async function providerJson<T>(target:URL,signal:AbortSignal):Promise<T|null>{
   }) as T|null;}catch{return null;}
 }
 async function uncachedProviderJson<T>(target:URL,signal:AbortSignal):Promise<T|null>{
-  try{const response=await fetch(target,{headers:{Accept:"application/dns-json, application/rdap+json, application/json"},redirect:"manual",signal});if(!response.ok){await response.body?.cancel();return null;}const reader=response.body?.getReader();if(!reader)return null;let bytes=0;let text="";const decoder=new TextDecoder();try{while(true){const{done,value}=await reader.read();if(done)break;bytes+=value.byteLength;if(bytes>512_000){await reader.cancel();return null;}text+=decoder.decode(value,{stream:true});}}finally{reader.releaseLock();}return JSON.parse(text+decoder.decode())as T;}catch{return null;}
+  // Cloudflare's JSON DNS endpoint rejects the shared, mixed Accept header.
+  const accept=target.hostname==="cloudflare-dns.com"?"application/dns-json":"application/rdap+json, application/json";
+  try{const response=await fetch(target,{headers:{Accept:accept},redirect:"manual",signal});if(!response.ok){await response.body?.cancel();return null;}const reader=response.body?.getReader();if(!reader)return null;let bytes=0;let text="";const decoder=new TextDecoder();try{while(true){const{done,value}=await reader.read();if(done)break;bytes+=value.byteLength;if(bytes>512_000){await reader.cancel();return null;}text+=decoder.decode(value,{stream:true});}}finally{reader.releaseLock();}return JSON.parse(text+decoder.decode())as T;}catch{return null;}
 }
 let rdapBootstrap:{expires:number;services:[string[],string[]][]}|null=null;
 async function registration(domain:string,signal:AbortSignal):Promise<{data:Rdap|null;source:string}>{
